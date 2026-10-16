@@ -36,9 +36,11 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Syntax check (node --check over shipped sources)
+      - name: Syntax check (node --check over shipped sources and tests)
         shell: bash
-        run: node --check index.js
+        run: |
+          node --check index.js
+          for f in tests/*.test.mjs; do node --check "$f"; done
 
   build:
     runs-on: ubuntu-latest
@@ -62,9 +64,9 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Skeleton contract tests (node --test)
+      - name: Behavioral tests (node --test)
         shell: bash
-        run: node --test tests/bootstrap.test.mjs
+        run: node --test tests/*.test.mjs
 
   license-check:
     runs-on: ubuntu-latest
