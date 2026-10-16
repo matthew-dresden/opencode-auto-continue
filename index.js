@@ -101,8 +101,7 @@ function makeLogger() {
 
 // Extract the message-relevant view of one transcript entry. The V2
 // ctx.session.context() stream yields { info, parts } entries; the decision
-// state machine reads info.role, info.finish, info.error and the latest
-// compaction part as evidence.
+// state machine reads info.role, info.finish and info.error as evidence.
 function summarizeTranscript(messages) {
   const entries = Array.isArray(messages) ? messages : [];
   const last = entries.length > 0 ? entries[entries.length - 1] : undefined;
@@ -111,16 +110,7 @@ function summarizeTranscript(messages) {
   const finish =
     typeof lastInfo?.finish === "string" ? lastInfo.finish : undefined;
   const hasError = lastInfo?.error != null;
-  let compactionSeen = false;
-  for (const entry of entries) {
-    const parts = entry?.parts;
-    if (!Array.isArray(parts)) continue;
-    if (parts.some((part) => part?.type === "compaction")) {
-      compactionSeen = true;
-      break;
-    }
-  }
-  return { role, finish, hasError, compactionSeen, lastRoleKnown: role !== undefined };
+  return { role, finish, hasError, lastRoleKnown: role !== undefined };
 }
 
 function definePlugin() {

@@ -54,9 +54,9 @@ jobs:
         shell: bash
         run: npm pack --dry-run
 
-      - name: Skeleton contract tests (node --test)
+      - name: Behavioral tests (node --test)
         shell: bash
-        run: node --test tests/bootstrap.test.mjs
+        run: node --test tests/*.test.mjs
 
       - name: License and NOTICE compliance
         shell: bash
