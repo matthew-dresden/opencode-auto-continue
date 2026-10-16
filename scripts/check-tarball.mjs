@@ -5,9 +5,8 @@
 // package.json "files" allowlist policy and contains no secret material:
 //   ALLOWLIST (exact set): package.json, README.md, LICENSE, NOTICE, index.js.
 //   npm adds the mandatory metadata files automatically; index.js is the only
-//   shipped source file in the bootstrap skeleton. Any member outside the
-//   allowlist is a violation. The port story (v1.0.0) extends the allowlist
-//   when build output lands.
+//   shipped source file. Any member outside the allowlist is a violation;
+//   extend the allowlist when new shipped sources or build output land.
 //   FORBIDDEN content: private key blocks, cloud API token shapes, and
 //   key=value secret assignments in text files.
 //
