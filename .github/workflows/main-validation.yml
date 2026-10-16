@@ -32,6 +32,7 @@ jobs:
         shell: bash
         env:
           COMMIT_MSG: ${{ github.event.head_commit.message }}
+          PYTHONDONTWRITEBYTECODE: 1
         run: python3 -m ci.check_release_commit --commit-message "${COMMIT_MSG}" --output "${GITHUB_OUTPUT}"
 
   validate:
@@ -95,6 +96,8 @@ jobs:
       - name: Calculate version
         id: calc
         shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: 1
         run: python3 -m ci.ci_calculate_version --output "${GITHUB_OUTPUT}"
 
       - name: Create release branch
@@ -109,12 +112,14 @@ jobs:
         shell: bash
         env:
           NEXT_VERSION: ${{ steps.calc.outputs.next_version }}
+          PYTHONDONTWRITEBYTECODE: 1
         run: python3 -m ci.update_version_files --version "${NEXT_VERSION}"
 
       - name: Generate changelog
         shell: bash
         env:
           NEXT_VERSION: ${{ steps.calc.outputs.next_version }}
+          PYTHONDONTWRITEBYTECODE: 1
         run: python3 -m ci.ci_generate_changelog --version "${NEXT_VERSION}" --output "${GITHUB_OUTPUT}"
 
       - name: Commit release changes

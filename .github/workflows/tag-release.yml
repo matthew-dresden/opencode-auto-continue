@@ -33,6 +33,7 @@ jobs:
         shell: bash
         env:
           COMMIT_MSG: ${{ github.event.head_commit.message }}
+          PYTHONDONTWRITEBYTECODE: 1
         run: python3 -m ci.check_release_commit --commit-message "${COMMIT_MSG}" --output "${GITHUB_OUTPUT}"
 
       - name: Configure git

@@ -20,6 +20,7 @@ jobs:
         shell: bash
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
+          PYTHONDONTWRITEBYTECODE: 1
         run: python3 -m ci.validate_pr_title --title "$PR_TITLE"
 
   # The bootstrap skeleton has no linter configured yet. This job is not a
@@ -101,4 +102,6 @@ jobs:
 
       - name: Version immutability (package.json version is release-automation-owned)
         shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: 1
         run: python3 -m ci.check_version_immutability --base-ref origin/main
