@@ -1,0 +1,11 @@
+opencode-auto-continue
+Copyright 2026 Matthew Dresden
+
+This project is an independent, clean-room implementation. It is inspired by
+hjzccc/opencode-auto-continue (https://github.com/hjzccc/opencode-auto-continue),
+an unlicensed project.
+
+No code, files, or structure were copied or derived from the upstream project.
+This implementation was written from scratch against the opencode v2 plugin API.
+
+Contact: open an issue in this repository.

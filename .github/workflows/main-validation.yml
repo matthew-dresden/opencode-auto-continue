@@ -1,0 +1,141 @@
+name: Main Validation
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: main-validation
+  cancel-in-progress: false
+
+# Release-bot identity comes from the RELEASE_BOT_LOGIN repo variable, not a
+# literal, so identity changes never require a workflow edit. Fail-closed:
+# when unset, App-token minting in release-pr fails loudly.
+env:
+  GIT_USER: ${{ vars.RELEASE_BOT_LOGIN }}
+  GIT_USER_EMAIL: ${{ vars.RELEASE_BOT_LOGIN }}@users.noreply.github.com
+
+jobs:
+  skip-check:
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.check.outputs.should_skip }}
+      release_version: ${{ steps.check.outputs.release_version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for release commit
+        id: check
+        shell: bash
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: python3 -m ci.check_release_commit --commit-message "${COMMIT_MSG}" --output "${GITHUB_OUTPUT}"
+
+  validate:
+    needs: [skip-check]
+    if: needs.skip-check.outputs.should_skip != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Syntax check
+        shell: bash
+        run: node --check index.js
+
+      - name: Build artifact check (package must pack cleanly)
+        shell: bash
+        run: npm pack --dry-run
+
+      - name: Skeleton contract tests (node --test)
+        shell: bash
+        run: node --test tests/bootstrap.test.mjs
+
+      - name: License and NOTICE compliance
+        shell: bash
+        run: node scripts/check-license.mjs
+
+      - name: Tarball allowlist and leak gates
+        shell: bash
+        run: node scripts/check-tarball.mjs
+
+  release-pr:
+    needs: [skip-check, validate]
+    if: needs.skip-check.outputs.should_skip != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Fetch latest main and tags
+        shell: bash
+        run: git fetch origin main --tags
+
+      - name: Configure git
+        shell: bash
+        run: |
+          git config user.name "${GIT_USER}"
+          git config user.email "${GIT_USER_EMAIL}"
+
+      - name: Calculate version
+        id: calc
+        shell: bash
+        run: python3 -m ci.ci_calculate_version --output "${GITHUB_OUTPUT}"
+
+      - name: Create release branch
+        shell: bash
+        env:
+          FULL_TAG: ${{ steps.calc.outputs.full_tag }}
+        run: |
+          git reset --hard origin/main
+          git checkout -b "release/${FULL_TAG}"
+
+      - name: Update version files
+        shell: bash
+        env:
+          NEXT_VERSION: ${{ steps.calc.outputs.next_version }}
+        run: python3 -m ci.update_version_files --version "${NEXT_VERSION}"
+
+      - name: Generate changelog
+        shell: bash
+        env:
+          NEXT_VERSION: ${{ steps.calc.outputs.next_version }}
+        run: python3 -m ci.ci_generate_changelog --version "${NEXT_VERSION}" --output "${GITHUB_OUTPUT}"
+
+      - name: Commit release changes
+        shell: bash
+        env:
+          FULL_TAG: ${{ steps.calc.outputs.full_tag }}
+        run: |
+          git add -A
+          git commit -m "chore(release): ${FULL_TAG}"
+          git push origin "release/${FULL_TAG}"
+
+      - name: Open release PR
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          FULL_TAG: ${{ steps.calc.outputs.full_tag }}
+          NEXT_VERSION: ${{ steps.calc.outputs.next_version }}
+        run: >-
+          gh pr create
+          --repo '${{ github.repository }}'
+          --base main
+          --head "release/${FULL_TAG}"
+          --title "chore(release): ${FULL_TAG}"
+          --body "Automated release PR. Bumps package.json to ${NEXT_VERSION} and updates the changelog. Merging creates tag ${FULL_TAG} and the GitHub Release."

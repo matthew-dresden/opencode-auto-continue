@@ -1,0 +1,15 @@
+{
+  "name": "@matthew-dresden/opencode-auto-continue",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "index.js",
+  "license": "Apache-2.0",
+  "private": false,
+  "files": [
+    "index.js",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  }
+}

@@ -1,0 +1,121 @@
+name: Tag Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tag-release
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Check for release commit
+        id: check
+        shell: bash
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: python3 -m ci.check_release_commit --commit-message "${COMMIT_MSG}" --output "${GITHUB_OUTPUT}"
+
+      - name: Configure git
+        shell: bash
+        env:
+          GIT_USER: ${{ vars.RELEASE_BOT_LOGIN }}
+          GIT_USER_EMAIL: ${{ vars.RELEASE_BOT_LOGIN }}@users.noreply.github.com
+        run: |
+          git config user.name "${GIT_USER}"
+          git config user.email "${GIT_USER_EMAIL}"
+
+      - name: Create tag
+        id: tag
+        if: steps.check.outputs.should_skip == 'true'
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ steps.check.outputs.release_version }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          FULL_TAG="v${RELEASE_VERSION}"
+          if git rev-parse -q --verify "refs/tags/${FULL_TAG}" >/dev/null; then
+            echo "::notice::Tag ${FULL_TAG} already exists, skipping"
+            echo "created=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          git tag -a "${FULL_TAG}" -m "Release ${FULL_TAG}"
+          git push origin "${FULL_TAG}"
+          echo "created=true" >> "${GITHUB_OUTPUT}"
+          echo "full_tag=${FULL_TAG}" >> "${GITHUB_OUTPUT}"
+
+      - name: Create GitHub Release
+        if: steps.tag.outputs.created == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          FULL_TAG: ${{ steps.tag.outputs.full_tag }}
+          RELEASE_VERSION: ${{ steps.check.outputs.release_version }}
+        run: |
+          awk -v header="## [${RELEASE_VERSION}]" '
+            index($0, header) == 1 { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md | sed '/./,$!d' > release-notes.md
+          gh release create "${FULL_TAG}" \
+            --repo '${{ github.repository }}' \
+            --title "${FULL_TAG}" \
+            --notes-file release-notes.md \
+            --target main
+
+  # ---------------------------------------------------------------------------
+  # CANARY GATED: activated after the registry canary verdict (story 2.0).
+  #
+  # This is the ONLY registry-publish path in this repository. It can NEVER run
+  # on a push-triggered workflow: the condition requires a manual
+  # workflow_dispatch AND the repository variable REGISTRY_READY == 'true'.
+  # The REGISTRY_READY variable is intentionally absent until the canary
+  # probe passes; until then this job never runs and nothing is ever
+  # published.
+  #
+  # Preconditions before activation:
+  #   1. The registry canary verdict flips REGISTRY_READY to 'true'.
+  #   2. The plugin is ported to the v2 plugin API (v1.0.0, story 2.5).
+  #      (package.json already carries the scoped name
+  #      @matthew-dresden/opencode-auto-continue, which GitHub Packages
+  #      requires.)
+  # ---------------------------------------------------------------------------
+  publish:
+    needs: [tag]
+    if: github.event_name == 'workflow_dispatch' && vars.REGISTRY_READY == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://npm.pkg.github.com"
+
+      - name: Publish to GitHub Packages
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm publish

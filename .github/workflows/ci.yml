@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  pr-title:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate PR title (conventional commits, breaking ! supported)
+        shell: bash
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: python3 -m ci.validate_pr_title --title "$PR_TITLE"
+
+  # The bootstrap skeleton has no linter configured yet. This job is not a
+  # stub: node --check parses every shipped source file and fails the job on
+  # any syntax error. Its scope widens when a real linter lands with the
+  # v1.0.0 port (story 2.5).
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Syntax check (node --check over shipped sources)
+        shell: bash
+        run: node --check index.js
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Build artifact check (package must pack cleanly)
+        shell: bash
+        run: npm pack --dry-run
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Skeleton contract tests (node --test)
+        shell: bash
+        run: node --test tests/bootstrap.test.mjs
+
+  license-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: License and NOTICE compliance
+        shell: bash
+        run: node scripts/check-license.mjs
+
+  tarball-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Tarball allowlist and leak gates
+        shell: bash
+        run: node scripts/check-tarball.mjs
+
+  version-immutability:
+    # Release-bot PRs are exempt: the release pipeline owns the version field.
+    # The identity comes from the RELEASE_BOT_LOGIN repo variable and the gate
+    # is fail-closed: when the variable is unset, the exemption matches
+    # nobody and the check runs on every PR.
+    if: github.event.pull_request.user.login != vars.RELEASE_BOT_LOGIN
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Version immutability (package.json version is release-automation-owned)
+        shell: bash
+        run: python3 -m ci.check_version_immutability --base-ref origin/main
