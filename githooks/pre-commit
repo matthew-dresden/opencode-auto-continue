@@ -1,0 +1,27 @@
+#!/bin/sh
+# House rule: no secret-shaped material (real, test, or synthetic) in code or
+# history, ever. Real credentials come from AWS SSM at runtime. Test crypto
+# material is generated at runtime.
+set -e
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "gitleaks is not on PATH. Install it (e.g. 'brew install gitleaks'), then retry." >&2
+  exit 1
+fi
+
+if ! gitleaks protect --staged --redact -v; then
+  cat >&2 <<'MSG'
+
+SECRET-SHAPED MATERIAL DETECTED IN STAGED CHANGES: COMMIT BLOCKED.
+Remediation:
+  - Remove the material from this change. Never commit keys, tokens, or
+    credentials, real, test, or synthetic.
+  - Real credentials: fetch from AWS SSM Parameter Store / Secrets Manager at
+    runtime.
+  - Test crypto material: generate at runtime inside the test (see
+    tests/module/http-client.test.ts for the generate-at-runtime pattern).
+  - If material already landed in history, history must be rewritten
+    (git filter-repo); see scripts/security/README.md.
+MSG
+  exit 1
+fi

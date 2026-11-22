@@ -1,0 +1,13 @@
+# House rule: No secret-shaped material (real, test, or synthetic) in code or
+# history, ever. Real credentials come from AWS SSM at runtime. Test crypto
+# material is generated at runtime.
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "pem-private-key-block"
+title = "PEM Private Key Block"
+description = "House rule: no secret-shaped material (real, test, or synthetic) in code or history, ever. Real credentials come from AWS SSM at runtime. Test crypto material is generated at runtime. Any PEM private key block is rejected."
+regex = '''-----BEGIN [A-Z ]*PRIVATE KEY-----'''
+tags = ["key", "pem", "private"]
