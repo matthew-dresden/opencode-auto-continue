@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.0] - 2026-11-28
+
+### Added
+
+- promote opencode-auto-continue-mac-dev dev main to production main (the 2026-11-28 wave) (#8)
+
 ## [1.0.0] - 2026-10-16
 
 ### Breaking Changes
