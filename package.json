@@ -11,5 +11,8 @@
   ],
   "publishConfig": {
     "registry": "https://npm.pkg.github.com/"
+  },
+  "scripts": {
+    "prepare": "bash scripts/security/install-hooks.sh"
   }
 }

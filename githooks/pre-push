@@ -1,0 +1,24 @@
+#!/bin/sh
+# House rule: no secret-shaped material (real, test, or synthetic) in code or
+# history, ever. Real credentials come from AWS SSM at runtime. Test crypto
+# material is generated at runtime.
+set -e
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "gitleaks is not on PATH. Install it (e.g. 'brew install gitleaks'), then retry." >&2
+  exit 1
+fi
+
+if ! gitleaks detect --redact -v; then
+  cat >&2 <<'MSG'
+
+SECRET-SHAPED MATERIAL FOUND IN REPO HISTORY: PUSH BLOCKED.
+Remediation:
+  - Purge the material from history (git filter-repo) and force-push rewritten
+    refs; see scripts/security/README.md.
+  - Never reintroduce keys, tokens, or credentials, real, test, or synthetic.
+    Use AWS SSM at runtime for real credentials and runtime generation for
+    test crypto material.
+MSG
+  exit 1
+fi
