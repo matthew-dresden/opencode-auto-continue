@@ -43,7 +43,7 @@ jobs:
         run: >-
           enabled="$(gh pr view '${{ github.event.pull_request.number }}'
           --repo '${{ github.repository }}' --json autoMergeRequest
-          --jq .autoMergeRequest != null)";
+          --jq '.autoMergeRequest != null')";
           echo "already_enabled=${enabled}" >> "${GITHUB_OUTPUT}"
 
       - name: Enable auto-merge (squash)
