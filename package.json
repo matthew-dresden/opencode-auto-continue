@@ -1,6 +1,6 @@
 {
   "name": "@matthew-dresden/opencode-auto-continue",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "main": "index.js",
   "license": "Apache-2.0",
